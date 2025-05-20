@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/models/trip.dart';
 import 'package:frontend/services/trip_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class CreateTripScreen extends StatefulWidget {
   const CreateTripScreen({super.key});
@@ -13,95 +16,218 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _destinationController = TextEditingController();
-  final _budgetController = TextEditingController();
   final _locationController = TextEditingController();
-  DateTime _startDate = DateTime.now();
-  DateTime? _endDate;
+  final _budgetController = TextEditingController();
+  final _peopleController = TextEditingController();
+  DateTime _selectedDate = DateTime.now();
+  DateTime _selectedEndDate = DateTime.now();
+  String? _imagePath;
   final _tripService = TripService();
-
-  @override
-  void initState() {
-    super.initState();
-    _startDate = DateTime.now();
-  }
 
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _destinationController.dispose();
-    _budgetController.dispose();
     _locationController.dispose();
+    _budgetController.dispose();
+    _peopleController.dispose();
     super.dispose();
   }
 
-  Future<void> _selectDate(BuildContext context, bool isStartDate) async {
+  Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: isStartDate ? _startDate : (_endDate ?? _startDate),
+      initialDate: _selectedDate,
       firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
     );
-    if (picked != null) {
+    if (picked != null && picked != _selectedDate) {
       setState(() {
-        if (isStartDate) {
-          _startDate = picked;
-        } else {
-          _endDate = picked;
-        }
+        _selectedDate = picked;
       });
     }
   }
 
-  Future<void> _createTrip() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _selectEndDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedEndDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+    );
+    if (picked != null && picked != _selectedEndDate) {
+      setState(() {
+        _selectedEndDate = picked;
+      });
+    }
+  }
 
-    try {
-      final trip = Trip(
-        id: '', // This will be set by the backend
-        title: _titleController.text,
-        description: _descriptionController.text,
-        destination: _destinationController.text,
-        budget: double.parse(_budgetController.text),
-        date: _startDate,
-        userId: '', // This will be set by the backend
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        location: _locationController.text,
-        startDate: _startDate,
-        endDate: _endDate,
-      );
-
-      final createdTrip = await _tripService.createTrip(trip);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Trip created successfully!')),
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    await showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Pick from gallery'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final XFile? image = await picker.pickImage(
+                    source: ImageSource.gallery,
+                    maxWidth: 1800,
+                    maxHeight: 1800,
+                  );
+                  if (image != null) {
+                    setState(() {
+                      _imagePath = image.path;
+                    });
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera),
+                title: const Text('Take a photo'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final XFile? image = await picker.pickImage(
+                    source: ImageSource.camera,
+                    maxWidth: 1800,
+                    maxHeight: 1800,
+                  );
+                  if (image != null) {
+                    setState(() {
+                      _imagePath = image.path;
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
         );
-        Navigator.pop(context, true);
+      },
+    );
+  }
+
+  Future<void> _createTrip() async {
+    if (_formKey.currentState!.validate()) {
+      try {
+        final trip = Trip(
+          id: '', // Will be set by the server
+          title: _titleController.text,
+          description: _descriptionController.text,
+          location: _locationController.text,
+          budget: double.tryParse(_budgetController.text),
+          startDate: _selectedDate,
+          endDate: _selectedEndDate,
+          userId: '', // Will be set by the server
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          imagePath: _imagePath,
+          numberOfPeople: int.tryParse(_peopleController.text) ?? 1,
+        );
+
+        await _tripService.createTrip(trip);
+        if (mounted) {
+          Navigator.pop(context, true);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error creating trip: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error creating trip: $e')));
-      }
+    }
+  }
+
+  Widget _buildImagePreview() {
+    if (_imagePath == null) {
+      return Container(
+        width: double.infinity,
+        height: 200,
+        color: Colors.grey[200],
+        child: const Icon(Icons.add_a_photo, size: 50),
+      );
+    }
+
+    if (kIsWeb) {
+      return Image.network(
+        _imagePath!,
+        width: double.infinity,
+        height: 200,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            width: double.infinity,
+            height: 200,
+            color: Colors.grey[200],
+            child: const Icon(Icons.error, size: 50),
+          );
+        },
+      );
+    } else {
+      return Image.file(
+        File(_imagePath!),
+        width: double.infinity,
+        height: 200,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            width: double.infinity,
+            height: 200,
+            color: Colors.grey[200],
+            child: const Icon(Icons.error, size: 50),
+          );
+        },
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Create New Trip')),
-      body: Padding(
+      appBar: AppBar(
+        title: const Text('Create Trip'),
+        backgroundColor: const Color(0xFF1E8449),
+        foregroundColor: Colors.white,
+      ),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
-          child: ListView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              GestureDetector(
+                onTap: _pickImage,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: _buildImagePreview(),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
               TextFormField(
                 controller: _titleController,
-                decoration: const InputDecoration(labelText: 'Title'),
+                decoration: InputDecoration(
+                  labelText: 'Title',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter a title';
@@ -109,9 +235,17 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _descriptionController,
-                decoration: const InputDecoration(labelText: 'Description'),
+                decoration: InputDecoration(
+                  labelText: 'Description',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                ),
                 maxLines: 3,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -120,19 +254,17 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                   return null;
                 },
               ),
-              TextFormField(
-                controller: _destinationController,
-                decoration: const InputDecoration(labelText: 'Destination'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a destination';
-                  }
-                  return null;
-                },
-              ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _locationController,
-                decoration: const InputDecoration(labelText: 'Location'),
+                decoration: InputDecoration(
+                  labelText: 'Location',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter a location';
@@ -140,43 +272,104 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                   return null;
                 },
               ),
-              TextFormField(
-                controller: _budgetController,
-                decoration: const InputDecoration(labelText: 'Budget'),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a budget';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Please enter a valid number';
-                  }
-                  return null;
-                },
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _budgetController,
+                      decoration: InputDecoration(
+                        labelText: 'Budget',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        prefixText: '\$ ',
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _peopleController,
+                      decoration: InputDecoration(
+                        labelText: 'Number of People',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        final number = int.tryParse(value);
+                        if (number == null || number < 1) {
+                          return 'Min: 1';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
-              ListTile(
-                title: const Text('Start Date'),
-                subtitle: Text(
-                  '${_startDate.day}/${_startDate.month}/${_startDate.year}',
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                trailing: const Icon(Icons.calendar_today),
-                onTap: () => _selectDate(context, true),
+                child: ListTile(
+                  title: const Text('Start Date'),
+                  subtitle: Text(
+                    _selectedDate.toString().split(' ')[0],
+                    style: const TextStyle(
+                      color: Color(0xFF1E8449),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: _selectDate,
+                ),
               ),
-              ListTile(
-                title: const Text('End Date (Optional)'),
-                subtitle: Text(
-                  _endDate != null
-                      ? '${_endDate!.day}/${_endDate!.month}/${_endDate!.year}'
-                      : 'Not set',
+              const SizedBox(height: 16),
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                trailing: const Icon(Icons.calendar_today),
-                onTap: () => _selectDate(context, false),
+                child: ListTile(
+                  title: const Text('End Date'),
+                  subtitle: Text(
+                    _selectedEndDate.toString().split(' ')[0],
+                    style: const TextStyle(
+                      color: Color(0xFF1E8449),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: _selectEndDate,
+                ),
               ),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _createTrip,
-                child: const Text('Create Trip'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E8449),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Create Trip',
+                  style: TextStyle(fontSize: 18),
+                ),
               ),
             ],
           ),

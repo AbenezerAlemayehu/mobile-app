@@ -5,31 +5,31 @@ class Trip {
   final String id;
   final String title;
   final String description;
-  final String destination;
-  final double budget;
-  final DateTime date;
+  final String location;
+  final double? budget;
+  final DateTime startDate;
   final String userId;
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? imagePath;
-  final String? location;
-  final DateTime? startDate;
+  final String? destination;
   final DateTime? endDate;
+  final int numberOfPeople;
 
   Trip({
     required this.id,
     required this.title,
     required this.description,
-    required this.destination,
-    required this.budget,
-    required this.date,
+    required this.location,
+    this.budget,
+    required this.startDate,
     required this.userId,
     required this.createdAt,
     required this.updatedAt,
     this.imagePath,
-    this.location,
-    this.startDate,
+    this.destination,
     this.endDate,
+    this.numberOfPeople = 1,
   });
 
   factory Trip.fromJson(Map<String, dynamic> json) {
@@ -38,11 +38,11 @@ class Trip {
         id: json['id']?.toString() ?? '',
         title: json['title']?.toString() ?? '',
         description: json['description']?.toString() ?? '',
-        destination: json['destination']?.toString() ?? '',
-        budget: (json['budget'] as num?)?.toDouble() ?? 0.0,
-        date:
-            json['date'] != null
-                ? DateTime.parse(json['date'].toString())
+        location: json['location']?.toString() ?? '',
+        budget: (json['budget'] as num?)?.toDouble(),
+        startDate:
+            json['startDate'] != null
+                ? DateTime.parse(json['startDate'].toString())
                 : DateTime.now(),
         userId: json['userId']?.toString() ?? '',
         createdAt:
@@ -54,15 +54,10 @@ class Trip {
                 ? DateTime.parse(json['updatedAt'].toString())
                 : DateTime.now(),
         imagePath: json['imagePath']?.toString(),
-        location: json['location']?.toString(),
-        startDate:
-            json['startDate'] != null
-                ? DateTime.parse(json['startDate'].toString())
-                : null,
+        destination: json['destination']?.toString(),
         endDate:
-            json['endDate'] != null
-                ? DateTime.parse(json['endDate'].toString())
-                : null,
+            json['endDate'] != null ? DateTime.parse(json['endDate']) : null,
+        numberOfPeople: json['numberOfPeople'] as int? ?? 1,
       );
     } catch (e, stackTrace) {
       print('Error parsing trip JSON: $e');
@@ -77,16 +72,16 @@ class Trip {
       'id': id,
       'title': title,
       'description': description,
-      'destination': destination,
-      'budget': budget,
-      'date': date.toIso8601String(),
+      'location': location,
+      if (budget != null) 'budget': budget,
+      'startDate': startDate.toIso8601String(),
       'userId': userId,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       if (imagePath != null) 'imagePath': imagePath,
-      if (location != null) 'location': location,
-      if (startDate != null) 'startDate': startDate!.toIso8601String(),
+      if (destination != null) 'destination': destination,
       if (endDate != null) 'endDate': endDate!.toIso8601String(),
+      'numberOfPeople': numberOfPeople,
     };
   }
 }
