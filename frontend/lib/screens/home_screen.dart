@@ -6,6 +6,7 @@ import 'package:frontend/services/trip_service.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_carousel_widget/flutter_carousel_widget.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -32,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadTrips();
+    _loadUserProfile();
   }
 
   Future<void> _loadTrips() async {
@@ -53,6 +55,19 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _loadUserProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _username = prefs.getString('username') ?? 'User';
+      _email = prefs.getString('email') ?? '';
+      _profileImagePath = prefs.getString('profileImagePath');
+    });
+  }
+
+  String _username = 'User';
+  String _email = '';
+  String? _profileImagePath;
+
   Future<void> _navigateToCreateTrip() async {
     final result = await Navigator.push(
       context,
@@ -64,31 +79,72 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildTripImage(Trip trip) {
-    if (trip.imagePath == null) {
-      return const Icon(Icons.image, size: 56);
+    if (trip.imagePath == null || trip.imagePath!.isEmpty) {
+      return Container(
+        width: 56,
+        height: 56,
+        color: Colors.grey[200],
+        child: const Icon(Icons.image, size: 32, color: Colors.grey),
+      );
     }
 
-    if (kIsWeb) {
-      return Image.network(
-        trip.imagePath!,
-        width: 56,
-        height: 56,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return const Icon(Icons.image_not_supported, size: 56);
-        },
-      );
-    } else {
-      return Image.file(
-        File(trip.imagePath!),
-        width: 56,
-        height: 56,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return const Icon(Icons.image_not_supported, size: 56);
-        },
+    print('Loading image from path: ${trip.imagePath}');
+    return Image.file(
+      File(trip.imagePath!),
+      width: 56,
+      height: 56,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        print('Error loading image: $error');
+        print('Failed image path: ${trip.imagePath}');
+        return Container(
+          width: 56,
+          height: 56,
+          color: Colors.grey[200],
+          child: const Icon(
+            Icons.image_not_supported,
+            size: 32,
+            color: Colors.grey,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildProfileImage() {
+    if (_profileImagePath == null) {
+      return CircleAvatar(
+        backgroundColor: Colors.white,
+        child: ClipOval(
+          child: Container(
+            width: 90,
+            height: 90,
+            color: Colors.grey[200],
+            child: const Icon(Icons.person, size: 45, color: Colors.grey),
+          ),
+        ),
       );
     }
+
+    return CircleAvatar(
+      backgroundColor: Colors.white,
+      child: ClipOval(
+        child: Image.file(
+          File(_profileImagePath!),
+          width: 90,
+          height: 90,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              width: 90,
+              height: 90,
+              color: Colors.grey[200],
+              child: const Icon(Icons.person, size: 45, color: Colors.grey),
+            );
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -112,19 +168,9 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: EdgeInsets.zero,
           children: [
             UserAccountsDrawerHeader(
-              accountName: const Text('John Doe'),
-              accountEmail: const Text('john.doe@example.com'),
-              currentAccountPicture: CircleAvatar(
-                backgroundColor: Colors.white,
-                child: ClipOval(
-                  child: Image.network(
-                    'https://via.placeholder.com/150',
-                    width: 90,
-                    height: 90,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
+              accountName: Text(_username),
+              accountEmail: Text(_email),
+              currentAccountPicture: _buildProfileImage(),
               decoration: const BoxDecoration(
                 color: Color(0xFF1E8449), // Dark green
               ),
@@ -141,6 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
               title: const Text('Profile'),
               onTap: () {
                 Navigator.pop(context);
+                Navigator.pushNamed(context, '/profile');
               },
             ),
             ListTile(
@@ -154,8 +201,12 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.logout, color: Color(0xFF1E8449)),
               title: const Text('Logout'),
-              onTap: () {
-                Navigator.pop(context);
+              onTap: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.clear();
+                if (mounted) {
+                  Navigator.pushReplacementNamed(context, '/login');
+                }
               },
             ),
           ],
@@ -282,6 +333,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   child: InkWell(
                                     onTap: () {
+                                      print(
+                                        'Navigating to trip detail with image path: ${trip.imagePath}',
+                                      );
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
@@ -292,7 +346,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                                   'destination': trip.location,
                                                   'startDate':
                                                       trip.startDate
-                                                          ?.toString()
+                                                          .toString()
                                                           .split(' ')[0],
                                                   'endDate':
                                                       trip.endDate
@@ -332,21 +386,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                                     fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
-                                                if (trip.location != null &&
-                                                    trip.location!.isNotEmpty)
+                                                if (trip.location.isNotEmpty)
                                                   Text(
-                                                    trip.location!,
+                                                    trip.location,
                                                     style: const TextStyle(
                                                       color: Colors.grey,
                                                     ),
                                                   ),
-                                                if (trip.startDate != null)
-                                                  Text(
-                                                    'Start: ${trip.startDate!.toString().split(' ')[0]}',
-                                                    style: const TextStyle(
-                                                      color: Color(0xFF1E8449),
-                                                    ),
+                                                Text(
+                                                  'Start: ${trip.startDate.toString().split(' ')[0]}',
+                                                  style: const TextStyle(
+                                                    color: Color(0xFF1E8449),
                                                   ),
+                                                ),
                                               ],
                                             ),
                                           ),

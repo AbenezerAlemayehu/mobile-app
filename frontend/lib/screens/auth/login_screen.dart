@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/services/api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -31,6 +32,12 @@ class _LoginScreenState extends State<LoginScreen> {
         print('Login response received: $response'); // Debug log
 
         if (response['token'] != null) {
+          // Save user information
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('token', response['token']);
+          await prefs.setString('username', response['username'] ?? '');
+          await prefs.setString('email', _emailController.text);
+
           if (mounted) {
             Navigator.pushReplacementNamed(context, '/home');
           }

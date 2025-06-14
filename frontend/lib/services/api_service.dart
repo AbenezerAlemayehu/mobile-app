@@ -181,42 +181,37 @@ class ApiService {
       if (tripData['endDate'] != null) {
         request.fields['endDate'] = tripData['endDate'].toString();
       }
+      if (tripData['budget'] != null) {
+        request.fields['budget'] = tripData['budget'].toString();
+      }
+      if (tripData['numberOfPeople'] != null) {
+        request.fields['numberOfPeople'] =
+            tripData['numberOfPeople'].toString();
+      }
 
       // Add image file if present
       if (tripData['imagePath'] != null) {
-        if (kIsWeb) {
-          // For web, we need to convert the image URL to a file
-          final imageUrl = tripData['imagePath'];
-          final imageResponse = await http.get(Uri.parse(imageUrl));
-          if (imageResponse.statusCode == 200) {
-            request.files.add(
-              http.MultipartFile.fromBytes(
-                'image',
-                imageResponse.bodyBytes,
-                filename: 'trip_image.jpg',
-              ),
-            );
-          }
+        print('Processing image at path: ${tripData['imagePath']}');
+        final imageFile = File(tripData['imagePath']);
+        if (await imageFile.exists()) {
+          request.files.add(
+            await http.MultipartFile.fromPath('image', imageFile.path),
+          );
+          print('Image file added to request successfully');
         } else {
-          // For mobile/desktop, we can use the file directly
-          final imageFile = File(tripData['imagePath']);
-          if (await imageFile.exists()) {
-            request.files.add(
-              await http.MultipartFile.fromPath('image', imageFile.path),
-            );
-          }
+          print('Image file does not exist at path: ${tripData['imagePath']}');
         }
       }
 
-      print('Sending request with fields: ${request.fields}'); // Debug log
-      print('Sending request with files: ${request.files.length}'); // Debug log
+      print('Sending request with fields: ${request.fields}');
+      print('Sending request with files: ${request.files.length}');
 
       // Send the request
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
-      print('Create trip response status: ${response.statusCode}'); // Debug log
-      print('Create trip response body: ${response.body}'); // Debug log
+      print('Create trip response status: ${response.statusCode}');
+      print('Create trip response body: ${response.body}');
 
       if (response.statusCode != 201) {
         final errorBody = jsonDecode(response.body);
@@ -229,7 +224,7 @@ class ApiService {
       print('Trip creation result: $result');
       return result;
     } catch (e) {
-      print('Create trip error: $e'); // Debug log
+      print('Create trip error: $e');
       throw Exception('Failed to create trip: $e');
     }
   }

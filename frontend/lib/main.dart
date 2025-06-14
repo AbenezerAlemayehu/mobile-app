@@ -3,6 +3,7 @@ import 'package:frontend/screens/auth/login_screen.dart';
 import 'package:frontend/screens/auth/signup_screen.dart';
 import 'package:frontend/screens/home_screen.dart';
 import 'package:frontend/screens/create_trip_screen.dart';
+import 'package:frontend/screens/profile_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -22,6 +23,7 @@ class MyApp extends StatelessWidget {
         '/signup': (context) => const SignupScreen(),
         '/home': (context) => const HomeScreen(),
         '/create-trip': (context) => const CreateTripScreen(),
+        '/profile': (context) => const ProfileScreen(),
       },
       debugShowCheckedModeBanner: false,
     );

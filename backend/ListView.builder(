@@ -1,6 +1,0 @@
-ListView.builder(
-  itemCount: trips.length,
-  itemBuilder: (context, index) {
-    return ListTile(title: Text(trips[index].name));
-  },
-)

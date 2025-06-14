@@ -1,63 +1,68 @@
-import 'package:frontend/models/user.dart';
-import 'package:frontend/services/api_service.dart';
-
 class Trip {
   final String id;
+  final String userId;
+  final String username;
   final String title;
   final String description;
   final String location;
   final double? budget;
   final DateTime startDate;
-  final String userId;
+  final DateTime? endDate;
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? imagePath;
-  final String? destination;
-  final DateTime? endDate;
   final int numberOfPeople;
+  final String? category;
 
   Trip({
     required this.id,
+    required this.userId,
+    required this.username,
     required this.title,
     required this.description,
     required this.location,
     this.budget,
     required this.startDate,
-    required this.userId,
+    this.endDate,
     required this.createdAt,
     required this.updatedAt,
     this.imagePath,
-    this.destination,
-    this.endDate,
     this.numberOfPeople = 1,
+    this.category,
   });
 
   factory Trip.fromJson(Map<String, dynamic> json) {
     try {
+      String extractedUserId = '';
+      String extractedUsername = 'Unknown User';
+
+      // Handle the 'user' field, which can be null, a String (user ID), or a Map (user object)
+      if (json.containsKey('user') && json['user'] != null) {
+        if (json['user'] is String) {
+          extractedUserId = json['user'] as String;
+        } else if (json['user'] is Map) {
+          final userMap = json['user'] as Map<String, dynamic>;
+          extractedUserId = userMap['_id'] ?? '';
+          extractedUsername = userMap['username'] ?? 'Unknown User';
+        }
+      }
+
       return Trip(
-        id: json['id']?.toString() ?? '',
-        title: json['title']?.toString() ?? '',
-        description: json['description']?.toString() ?? '',
-        location: json['location']?.toString() ?? '',
-        budget: (json['budget'] as num?)?.toDouble(),
-        startDate:
-            json['startDate'] != null
-                ? DateTime.parse(json['startDate'].toString())
-                : DateTime.now(),
-        userId: json['userId']?.toString() ?? '',
-        createdAt:
-            json['createdAt'] != null
-                ? DateTime.parse(json['createdAt'].toString())
-                : DateTime.now(),
-        updatedAt:
-            json['updatedAt'] != null
-                ? DateTime.parse(json['updatedAt'].toString())
-                : DateTime.now(),
-        imagePath: json['imagePath']?.toString(),
-        destination: json['destination']?.toString(),
+        id: json['_id'] ?? '',
+        userId: extractedUserId,
+        username: extractedUsername,
+        title: json['title'] ?? '',
+        description: json['description'] ?? '',
+        location: json['location'] ?? '',
+        budget: json['budget']?.toDouble(),
+        startDate: DateTime.parse(json['startDate']),
         endDate:
             json['endDate'] != null ? DateTime.parse(json['endDate']) : null,
-        numberOfPeople: json['numberOfPeople'] as int? ?? 1,
+        createdAt: DateTime.parse(json['createdAt']),
+        updatedAt: DateTime.parse(json['updatedAt']),
+        imagePath: json['imagePath'] is String ? json['imagePath'] : null,
+        numberOfPeople: json['numberOfPeople'] ?? 1,
+        category: json['category'] is String ? json['category'] : null,
       );
     } catch (e, stackTrace) {
       print('Error parsing trip JSON: $e');
@@ -69,19 +74,20 @@ class Trip {
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
+      '_id': id,
+      'userId': userId,
+      'username': username,
       'title': title,
       'description': description,
       'location': location,
       if (budget != null) 'budget': budget,
       'startDate': startDate.toIso8601String(),
-      'userId': userId,
+      if (endDate != null) 'endDate': endDate!.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       if (imagePath != null) 'imagePath': imagePath,
-      if (destination != null) 'destination': destination,
-      if (endDate != null) 'endDate': endDate!.toIso8601String(),
       'numberOfPeople': numberOfPeople,
+      if (category != null) 'category': category,
     };
   }
 }
